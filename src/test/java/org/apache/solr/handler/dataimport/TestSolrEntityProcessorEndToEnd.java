@@ -34,7 +34,7 @@ import org.apache.lucene.util.IOUtils;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.embedded.JettyConfig;
 import org.apache.solr.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.apache.HttpSolrClient;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -99,7 +99,7 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
   }
 
   private String getSourceUrl() {
-    return buildUrl(jetty.getLocalPort(), "/solr/collection1");
+    return buildUrl(jetty.getLocalPort()) + "/collection1";
   }
 
   //TODO: fix this test to close its directories
@@ -347,14 +347,14 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
       dataDir.mkdirs();
       confDir.mkdirs();
 
-      FileUtils.copyFile(getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
+      FileUtils.copyFile(getFile(getSolrXmlFile()).toFile(), new File(homeDir, "solr.xml"));
       File f = new File(confDir, "solrconfig.xml");
-      FileUtils.copyFile(getFile(getSolrConfigFile()), f);
+      FileUtils.copyFile(getFile(getSolrConfigFile()).toFile(), f);
       f = new File(confDir, "schema.xml");
 
-      FileUtils.copyFile(getFile(getSchemaFile()), f);
+      FileUtils.copyFile(getFile(getSchemaFile()).toFile(), f);
       f = new File(confDir, "data-config.xml");
-      FileUtils.copyFile(getFile(SOURCE_CONF_DIR + "dataconfig-contentstream.xml"), f);
+      FileUtils.copyFile(getFile(SOURCE_CONF_DIR + "dataconfig-contentstream.xml").toFile(), f);
 
       Files.createFile(confDir.toPath().resolve("../core.properties"));
     }
@@ -373,7 +373,6 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
   }
 
   private static JettyConfig buildJettyConfig(String context) {
-    return JettyConfig.builder().setContext(context).stopAtShutdown(true).build();
+    return JettyConfig.builder().stopAtShutdown(true).build();
   }
-
 }

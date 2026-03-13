@@ -16,7 +16,6 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -39,14 +38,14 @@ import java.nio.charset.StandardCharsets;
  *
  * @since solr 1.3
  */
-public class SolrWriter extends DIHWriterBase implements DIHWriter {
+public class SolrWriter extends DIHWriterBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static final String LAST_INDEX_KEY = "last_index_time";
 
   private final UpdateRequestProcessor processor;
   protected final int commitWithin;
-  
+
   SolrQueryRequest req;
 
   public SolrWriter(UpdateRequestProcessor processor, SolrQueryRequest req) {
@@ -54,7 +53,7 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
     this.req = req;
     commitWithin = (req != null) ? req.getParams().getInt(UpdateParams.COMMIT_WITHIN, -1): -1;
   }
-  
+
   @Override
   public void close() {
     try {
@@ -67,10 +66,11 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
       try {
         processor.close();
       } catch (IOException e) {
-        SolrException.log(log, e);
+        log.error("In SolrWriter.close(): " + e);
       }
     }
   }
+
   @Override
   public boolean upload(SolrInputDocument d) {
     try {
@@ -79,12 +79,12 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
       command.commitWithin = commitWithin;
       processor.processAdd(command);
     } catch (Exception e) {
-      log.error("Error creating document : " + d, e);
+      log.error("Error creating document: '" + d + "': " + e);
       return false;
     }
     return true;
   }
-  
+
   @Override
   public void deleteDoc(Object id) {
     try {
@@ -161,12 +161,12 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
 
   static String getDocCount() {
     if (DocBuilder.INSTANCE.get() != null) {
-      return ""
-              + (DocBuilder.INSTANCE.get().importStatistics.docCount.get() + 1);
+      return "" + (DocBuilder.INSTANCE.get().importStatistics.docCount.get() + 1);
     } else {
       return null;
     }
   }
+
   @Override
   public void init(Context context) {
     /* NO-OP */

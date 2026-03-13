@@ -51,14 +51,13 @@ import org.junit.BeforeClass;
  *
  * @since solr 1.3
  */
-public abstract class AbstractDataImportHandlerTestCase extends
-        SolrTestCaseJ4 {
+public abstract class AbstractDataImportHandlerTestCase extends SolrTestCaseJ4 {
 
   // note, a little twisted that we shadow this static method
   public static void initCore(String config, String schema) throws Exception {
-    File testHome = createTempDir("core-home").toFile();
-    FileUtils.copyDirectory(getFile("dih/solr"), testHome);
-    initCore(config, schema, testHome.getAbsolutePath());
+    File testHome = createTempDir("solr").toFile();
+    FileUtils.copyDirectory(getFile("dih/solr").toFile(), testHome);
+    initCore(config, schema, testHome.toPath());
   }
 
   @BeforeClass

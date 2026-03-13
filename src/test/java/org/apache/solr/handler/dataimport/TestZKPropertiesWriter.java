@@ -31,7 +31,6 @@ import org.apache.solr.cloud.ZkTestServer;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
 import org.junit.After;
@@ -64,11 +63,11 @@ public class TestZKPropertiesWriter extends AbstractDataImportHandlerTestCase {
     System.setProperty("zkHost", zkServer.getZkAddress());
     System.setProperty("jetty.port", "0000");
 
-    zkServer.buildZooKeeper(getFile("dih/solr").toPath(),
+    zkServer.buildZooKeeper(getFile("dih/solr"),
         "dataimport-solrconfig.xml", "dataimport-schema.xml");
 
     //initCore("solrconfig.xml", "schema.xml", getFile("dih/solr").getAbsolutePath());
-    cc = createDefaultCoreContainer(getFile("dih/solr").toPath());
+    cc = createDefaultCoreContainer(getFile("dih/solr"));
   }
 
   @Before

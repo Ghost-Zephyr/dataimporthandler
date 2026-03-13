@@ -16,7 +16,7 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.jetty.HttpJettySolrClient;
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.cloud.ZkController;
@@ -40,19 +40,16 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
 
-
-@SuppressWarnings("unused")
 public class SolrCloudWriter extends SolrWriter { //not sure about ascendant
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static final String DST_COLL_PARAM = "destinationCollection";
-  private final Http2SolrClient updateClient;
+  private final HttpJettySolrClient updateClient;
   private final String destColl;
   private final DocCollection destDocColl;
   private final SolrCmdDistributor solrCmdDistributor;
 
-  @SuppressWarnings("unused")
   public SolrCloudWriter(UpdateRequestProcessor processor, SolrQueryRequest req) {
     super(processor, req);
     updateClient = req.getCoreContainer().getUpdateShardHandler().getUpdateOnlyHttpClient();
@@ -93,18 +90,15 @@ public class SolrCloudWriter extends SolrWriter { //not sure about ascendant
     }
   }
 
-
   @Override
   public void deleteDoc(Object key) {
     syncThenUpdateLog(u -> u.deleteById(key.toString()));
   }
 
-
   @Override
   public void deleteByQuery(String q) {
     syncThenUpdateLog(u -> u.deleteByQuery(q));
   }
-
 
   @Override
   public void commit(boolean optimize) {
@@ -127,9 +121,9 @@ public class SolrCloudWriter extends SolrWriter { //not sure about ascendant
     UpdateRequest ureq = new UpdateRequest();
     // otherwise I've got
     // Destination node is not provided!
-    //        at org.apache.solr.client.solrj.impl.Http2SolrClient.unwrapV2Request(Http2SolrClient.java:638)
-    String baseUrl = destDocColl.getActiveSlicesArr()[0].getLeader().getBaseUrl();
-    ureq.setBasePath(baseUrl);
+    //     at org.apache.solr.client.solrj.impl.Http2SolrClient.unwrapV2Request(Http2SolrClient.java:638)
+    String baseUrl = destDocColl.getActiveSlices().iterator().next().getLeader().getBaseUrl();
+    ureq.setPath(baseUrl);
 
     customizer.accept(ureq);
     ureq.process(updateClient, destColl);

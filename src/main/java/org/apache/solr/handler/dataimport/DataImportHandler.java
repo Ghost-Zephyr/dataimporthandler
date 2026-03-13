@@ -34,7 +34,6 @@ import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.RawResponseWriter;
@@ -43,6 +42,9 @@ import org.apache.solr.security.AuthorizationContext;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +67,7 @@ import static org.apache.solr.handler.dataimport.DataImporter.IMPORT_CMD;
  *
  * @since solr 1.3
  */
-public class DataImportHandler extends RequestHandlerBase implements
-        SolrCoreAware {
+public class DataImportHandler extends RequestHandlerBase implements SolrCoreAware {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -76,7 +77,7 @@ public class DataImportHandler extends RequestHandlerBase implements
 
   private String myName = "dataimport";
 
-  private MetricsMap metrics;
+  private HandlerMetrics metrics;
 
   private static final String PARAM_WRITER_IMPL = "writerImpl";
   private static final String DEFAULT_WRITER_NAME = "SolrWriter";
@@ -135,7 +136,7 @@ public class DataImportHandler extends RequestHandlerBase implements
       }
     }
     SolrParams params = req.getParams();
-    NamedList defaultParams = (NamedList) initArgs.get("defaults");
+    NamedList<String> defaultParams = (NamedList<String>) initArgs.get("defaults");
     RequestInfo requestParams = new RequestInfo(req, getParamsMap(params), contentStream);
     String command = requestParams.getCommand();
 
@@ -248,7 +249,6 @@ public class DataImportHandler extends RequestHandlerBase implements
     if (reqParams != null && reqParams.get(PARAM_WRITER_IMPL) != null) {
       writerClassStr = (String) reqParams.get(PARAM_WRITER_IMPL);
     }
-    DIHWriter writer;
     if (writerClassStr != null
         && !writerClassStr.equals(DEFAULT_WRITER_NAME)
         && !writerClassStr.equals(DocBuilder.class.getPackage().getName() + "."
@@ -269,31 +269,34 @@ public class DataImportHandler extends RequestHandlerBase implements
   }
 
   @Override
-  public void initializeMetrics(SolrMetricsContext parentContext, String scope) {
-    super.initializeMetrics(parentContext, scope);
-    metrics = new MetricsMap((map) -> {
-      if (importer != null) {
-        DocBuilder.Statistics cumulative = importer.cumulativeStatistics;
+  public void initializeMetrics(SolrMetricsContext parentContext, Attributes attributes) {
+    super.initializeMetrics(parentContext, attributes);
 
-        map.put("Status", importer.getStatus().toString());
+    DocBuilder.Statistics cumulative = importer.cumulativeStatistics;
+    attributes.asMap();
+    AttributesBuilder builder = attributes.toBuilder();
 
-        if (importer.docBuilder != null) {
-          DocBuilder.Statistics running = importer.docBuilder.importStatistics;
-          map.put("Documents Processed", running.docCount);
-          map.put("Requests made to DataSource", running.queryCount);
-          map.put("Rows Fetched", running.rowsCount);
-          map.put("Documents Deleted", running.deletedDocCount);
-          map.put("Documents Skipped", running.skipDocCount);
-        }
+    builder.put("Status", importer.getStatus().toString());
 
-        map.put(DataImporter.MSG.TOTAL_DOC_PROCESSED, cumulative.docCount);
-        map.put(DataImporter.MSG.TOTAL_QUERIES_EXECUTED, cumulative.queryCount);
-        map.put(DataImporter.MSG.TOTAL_ROWS_EXECUTED, cumulative.rowsCount);
-        map.put(DataImporter.MSG.TOTAL_DOCS_DELETED, cumulative.deletedDocCount);
-        map.put(DataImporter.MSG.TOTAL_DOCS_SKIPPED, cumulative.skipDocCount);
-      }
-    });
-    solrMetricsContext.gauge(metrics, true, "importer", getCategory().toString(), scope);
+    if (importer.docBuilder != null) {
+      DocBuilder.Statistics running = importer.docBuilder.importStatistics;
+      builder.put("Documents Processed", running.docCount.toString());
+      builder.put("Requests made to DataSource", running.queryCount.toString());
+      builder.put("Rows Fetched", running.rowsCount.toString());
+      builder.put("Documents Deleted", running.deletedDocCount.toString());
+      builder.put("Documents Skipped", running.skipDocCount.toString());
+    }
+
+    builder.put(DataImporter.MSG.TOTAL_DOC_PROCESSED, cumulative.docCount.toString());
+    builder.put(DataImporter.MSG.TOTAL_QUERIES_EXECUTED, cumulative.queryCount.toString());
+    builder.put(DataImporter.MSG.TOTAL_ROWS_EXECUTED, cumulative.rowsCount.toString());
+    builder.put(DataImporter.MSG.TOTAL_DOCS_DELETED, cumulative.deletedDocCount.toString());
+    builder.put(DataImporter.MSG.TOTAL_DOCS_SKIPPED, cumulative.skipDocCount.toString());
+
+    metrics = new HandlerMetrics(
+      solrMetricsContext,
+      attributes.toBuilder().put(CATEGORY_ATTR, getCategory().toString()).build(),
+      aggregateNodeLevelMetricsEnabled);
   }
 
   // //////////////////////SolrInfoMBeans methods //////////////////////

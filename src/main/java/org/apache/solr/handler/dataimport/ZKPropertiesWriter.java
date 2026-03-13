@@ -24,40 +24,43 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.DummyWatcher;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * <p>
- *  A SolrCloud-friendly extension of {@link SimplePropertiesWriter}.  
+ *  A SolrCloud-friendly extension of {@link SimplePropertiesWriter}.
  *  This implementation ignores the "directory" parameter, saving
  *  the properties file under /configs/[solrcloud collection name]/
  */
 public class ZKPropertiesWriter extends SimplePropertiesWriter {
-  
+
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  
+
   private String path;
   private SolrZkClient zkClient;
-  
+
   @Override
   public void init(DataImporter dataImporter, Map<String, String> params) {
     super.init(dataImporter, params);    
     zkClient = dataImporter.getCore().getCoreContainer().getZkController().getZkClient();
   }
-  
+
   @Override
   protected void findDirectory(DataImporter dataImporter, Map<String, String> params) {
     String collection = dataImporter.getCore().getCoreDescriptor().getCloudDescriptor().getCollectionName();
     path = "/configs/" + collection + "/" + filename;
   }
-  
+
   @Override
   public boolean isWritable() {
     return true;
   }
-  
+
   @Override
   public void persist(Map<String, Object> propObjs) {
     Properties existing = mapToProperties(readIndexerProperties());
@@ -66,23 +69,25 @@ public class ZKPropertiesWriter extends SimplePropertiesWriter {
     try {
       existing.store(output, null);
       byte[] bytes = output.toString().getBytes(StandardCharsets.UTF_8);
-      if (!zkClient.exists(path, false)) {
+      try {
+        zkClient.exists(path, DummyWatcher.INSTANCE);
+      } catch (KeeperException exc) {
         try {
           zkClient.makePath(path, false);
         } catch (NodeExistsException e) {}
       }
-      zkClient.setData(path, bytes, false);
+      zkClient.setData(path, bytes, -1);
     } catch (Exception e) {
       SolrZkClient.checkInterrupted(e);
       log.warn("Could not persist properties to " + path + " :" + e.getClass(), e);
     }
   }
-  
+
   @Override
   public Map<String, Object> readIndexerProperties() {
     Properties props = new Properties();
     try {
-      byte[] data = zkClient.getData(path, null, null, true);
+      byte[] data = zkClient.getData(path, DummyWatcher.INSTANCE, new Stat());
       if (data != null) {
         props.load(new StringReader(new String(data, StandardCharsets.UTF_8)));
       }
